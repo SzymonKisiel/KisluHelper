@@ -23,11 +23,11 @@ namespace Celeste.Mod.KisluHelper {
         }
 
         public override void Load() {
-            // TODO: apply any hooks that should always be active
+            Hooks.Load();
         }
 
         public override void Unload() {
-            // TODO: unapply any hooks applied in Load()
+            Hooks.Unload();
         }
     }
 }

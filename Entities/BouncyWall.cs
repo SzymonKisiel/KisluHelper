@@ -43,16 +43,16 @@ namespace Celeste.Mod.KisluHelper.Entities
         public override void Render()
         {
             Color c = Color.Chocolate;
-            if (GetFunnySettings())
+            if (GetExampleSettings())
             {
                 c = Color.GreenYellow;
             }
             Draw.Rect(base.X, base.Y, base.Width, base.Height, c);
         }
 
-        public bool GetFunnySettings()
+        public bool GetExampleSettings()
         {
-            return KisluHelperModule.Settings.FunnySwitch;
+            return KisluHelperModule.Settings.ExampleSwitch;
         }
 
         public override void Update()

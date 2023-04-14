@@ -1,7 +1,7 @@
 <Project Sdk="Microsoft.NET.Sdk">
 
     <PropertyGroup>
-        <TargetFramework>net472</TargetFramework>
+        <TargetFramework>net452</TargetFramework>
         <AssemblyName>KisluHelper</AssemblyName>
         <RootNamespace>Celeste.Mod.KisluHelper</RootNamespace>
         <LangVersion>latest</LangVersion>

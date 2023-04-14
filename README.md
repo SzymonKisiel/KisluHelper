@@ -1,2 +1,2 @@
 # KisluHelper
-Modification for Celeste game, which adds some custom entities.
+A modification for the game Celeste, which adds some custom entities.

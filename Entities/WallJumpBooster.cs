@@ -66,8 +66,10 @@ namespace Celeste.Mod.KisluHelper.Entities
             ILCursor cursor = new ILCursor(il);
             if (cursor.TryGotoNext(MoveType.After, instr => instr.MatchLdcR4(initWallJumpSpeedV)))
             {
-                cursor.EmitDelegate(GetWallJumpBoost);
-                cursor.Emit(OpCodes.Mul);
+                cursor.Emit(OpCodes.Ldarg_0);
+                cursor.Emit(OpCodes.Ldarg_0);
+                cursor.Emit(OpCodes.Ldfld, typeof(Player).GetField("onGround", BindingFlags.NonPublic | BindingFlags.Instance));
+                cursor.EmitDelegate(ApplyWallJumpBoost);
             }
         }
 
@@ -76,8 +78,10 @@ namespace Celeste.Mod.KisluHelper.Entities
             ILCursor cursor = new ILCursor(il);
             if (cursor.TryGotoNext(MoveType.After, instr => instr.MatchLdcR4(initWallBounceSpeedV)))
             {
-                cursor.EmitDelegate(GetWallJumpBoost);
-                cursor.Emit(OpCodes.Mul);
+                cursor.Emit(OpCodes.Ldarg_0);
+                cursor.Emit(OpCodes.Ldarg_0);
+                cursor.Emit(OpCodes.Ldfld, typeof(Player).GetField("onGround", BindingFlags.NonPublic | BindingFlags.Instance));
+                cursor.EmitDelegate(ApplyWallJumpBoost);
             }
         }
 
@@ -91,37 +95,23 @@ namespace Celeste.Mod.KisluHelper.Entities
             return solid;
         }
 
-        private static bool ShouldApplyWallJumpBoost(Player self)
+        private static float ApplyWallJumpBoost(float origSpeed, Player self, bool isOnGround)
         {
-            Solid wall = GetWall(self);
-            if (wall != null)
-            {
-                return wall.GetType() == typeof(WallJumpBooster);
-            }
-            return false;
-        }
-
-        private static float GetWallJumpBoost()
-        {
-
-            Player self = Engine.Scene.Tracker.GetEntity<Player>();
-            DynamicData dSelf = new DynamicData(self);
-            bool isOnGround = dSelf.Get<bool>("onGround");
             bool isClimbing = self.StateMachine.State == Player.StClimb;
 
             if (self == null || isOnGround && !isClimbing)
             {
-                return 1.0f;
+                return origSpeed;
             }
             Solid wall = GetWall(self);
             if (wall != null)
             {
                 if (wall.GetType() == typeof(WallJumpBooster))
                 {
-                    return wallJumpMultiplier;
+                    return origSpeed * wallJumpMultiplier;
                 }
             }
-            return 1.0f;
+            return origSpeed;
         }
     }
 }

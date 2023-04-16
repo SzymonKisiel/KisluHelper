@@ -100,6 +100,29 @@ namespace Celeste.Mod.KisluHelper.Entities
             cursor.EmitDelegate(ShouldApplyWallJumpBoost);
             cursor.Emit(OpCodes.Stloc, shouldApplyModVar);
 
+            if (cursor.TryGotoNext(MoveType.Before,
+                instr => instr.OpCode == OpCodes.Ldarg_0,
+                instr => instr.MatchLdfld<Player>("moveX")))
+            {
+
+                // sneak between the ldarg.0 and the ldfld (the ldarg.0 is the target to a jump instruction, so we should put ourselves after that.)
+                cursor.Index++;
+
+                ILCursor cursorAfterBranch = cursor.Clone();
+                if (cursorAfterBranch.TryGotoNext(MoveType.After, instr => instr.OpCode == OpCodes.Brfalse_S))
+                {
+
+                    // pop the ldarg.0
+                    cursor.Emit(OpCodes.Pop);
+
+                    cursor.Emit(OpCodes.Ldloc, shouldApplyModVar);
+                    cursor.Emit(OpCodes.Brtrue_S, cursorAfterBranch.Next);
+
+                    // push the ldarg.0 again   
+                    cursor.Emit(OpCodes.Ldarg_0);
+                }
+            }
+
             if (cursor.TryGotoNext(MoveType.After, instr => instr.MatchLdcR4(initWallJumpSpeedH)))
             {
                 cursor.Emit(OpCodes.Ldloc, shouldApplyModVar);
@@ -134,6 +157,20 @@ namespace Celeste.Mod.KisluHelper.Entities
             cursor.EmitReference(JumpType.SuperWallJump);
             cursor.EmitDelegate(ShouldApplyWallJumpBoost);
             cursor.Emit(OpCodes.Stloc, shouldApplyModVar);
+
+            // branch over if shouldn't apply
+            var nextInstruction = cursor.Next;
+            cursor.Emit(OpCodes.Ldloc, shouldApplyModVar);
+            cursor.Emit(OpCodes.Brfalse_S, nextInstruction);
+
+            // apply force move timer
+            cursor.Emit(OpCodes.Ldarg_0);
+            cursor.Emit(OpCodes.Ldarg_1);
+            cursor.Emit(OpCodes.Stfld, typeof(Player).GetField("forceMoveX", BindingFlags.NonPublic | BindingFlags.Instance));
+            cursor.Emit(OpCodes.Ldarg_0);
+            cursor.Emit(OpCodes.Ldc_R4, 0.16f);
+            cursor.Emit(OpCodes.Stfld, typeof(Player).GetField("forceMoveXTimer", BindingFlags.NonPublic | BindingFlags.Instance));
+
 
             if (cursor.TryGotoNext(MoveType.After, instr => instr.MatchLdcR4(initWallBounceSpeedH)))
             {

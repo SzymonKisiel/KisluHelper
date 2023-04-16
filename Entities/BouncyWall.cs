@@ -14,9 +14,9 @@ namespace Celeste.Mod.KisluHelper.Entities
 
         private static ILHook wallJumpHook;
 
-        private bool isColliding;
+        private const int WallJumpCheckDist = 3;
 
-        private PlayerCollider playerCollider;
+        private const int SuperWallJumpCheckDist = 5;
 
         private const float initWallJumpSpeedH = 130f;
 
@@ -25,6 +25,20 @@ namespace Celeste.Mod.KisluHelper.Entities
         private const float initWallBounceSpeedH = 170f;
 
         private const float initWallBounceSpeedV = -160f;
+
+        private const float wallJumpSpeedHMultiplier = 2.5f;
+
+        private const float wallJumpSpeedVMultiplier = 0.1f;
+
+        private const float wallBounceSpeedHMultiplier = wallJumpSpeedHMultiplier * initWallJumpSpeedH / initWallBounceSpeedH;
+
+        private const float wallBounceSpeedVMultiplier = wallJumpSpeedVMultiplier * initWallJumpSpeedV / initWallBounceSpeedV;
+
+        private enum JumpType
+        {
+            WallJump,
+            SuperWallJump
+        }
 
         public BouncyWall(EntityData data, Vector2 offset)
             : base(data.Position + offset, data.Width, data.Height, true)
@@ -55,115 +69,131 @@ namespace Celeste.Mod.KisluHelper.Entities
             return KisluHelperModule.Settings.ExampleSwitch;
         }
 
-        public override void Update()
+        public static void LoadHooks()
         {
-            base.Update();
-
-            //Player player = CollideFirst<Player>(collider);
-            //if ()
-            //{
-
-            //}
-            //bool flag = this.DashAttacking && this.DashDir.X == 0f && this.DashDir.Y == -1f;
-            Player player = CollideFirst<Player>(Position - Vector2.UnitX * 5.0f);
-            if (player == null)
-            {
-                player = CollideFirst<Player>(Position + Vector2.UnitX * 5.0f);
-            }
-            if (player != null && !isColliding)
-            {
-                isColliding = true;
-                LoadHooks();
-            }
-            else if (player == null && isColliding)
-            {
-                if (isColliding)
-                {
-                    UnloadHooks();
-                }
-                isColliding = false;
-            }
-        }
-
-        private void LoadHooks()
-        {
-            Logger.Log("KisluHelper/GoodbyeEntity", "Entered GoodbyeEntity");
-            //IL.Celeste.Player.Jump += ModJump;
-            IL.Celeste.Player.SuperWallJump += ModWallbounceJump;
             wallJumpHook = new ILHook(typeof(Player).GetMethod("orig_WallJump", BindingFlags.Instance | BindingFlags.NonPublic), ModWallJump);
+
+            IL.Celeste.Player.SuperWallJump += ModWallBounce;
         }
 
-        private void UnloadHooks()
+        public static void UnloadHooks()
         {
-            Logger.Log("KisluHelper/GoodbyeEntity", "Left GoodbyeEntity");
-            //IL.Celeste.Player.Jump -= ModJump;
-            IL.Celeste.Player.SuperWallJump -= ModWallbounceJump;
             if (wallJumpHook != null)
             {
                 wallJumpHook.Dispose();
             }
+
+            IL.Celeste.Player.SuperWallJump -= ModWallBounce;
         }
-
-        //private static void ModJump(ILContext il)
-        //{
-        //    ILCursor cursor = new ILCursor(il);
-
-        //    if (cursor.TryGotoNext(MoveType.After, instr => instr.MatchLdcR4(-105f)))
-        //    {
-        //        cursor.EmitDelegate<Func<float>>(getVerticalJumpMod);
-        //        cursor.Emit(OpCodes.Mul);
-        //    }
-        //}
 
         private static void ModWallJump(ILContext il)
         {
             ILCursor cursor = new ILCursor(il);
 
+            VariableDefinition shouldApplyModVar = new VariableDefinition(il.Import(typeof(bool)));
+            il.Body.Variables.Add(shouldApplyModVar);
+
+            cursor.Emit(OpCodes.Ldarg_0);
+            cursor.Emit(OpCodes.Ldarg_0);
+            cursor.Emit(OpCodes.Ldfld, typeof(Player).GetField("onGround", BindingFlags.NonPublic | BindingFlags.Instance));
+            cursor.EmitReference(JumpType.WallJump);
+            cursor.EmitDelegate(ShouldApplyWallJumpBoost);
+            cursor.Emit(OpCodes.Stloc, shouldApplyModVar);
+
             if (cursor.TryGotoNext(MoveType.After, instr => instr.MatchLdcR4(initWallJumpSpeedH)))
             {
-                cursor.EmitDelegate<Func<float>>(getHorizontalJumpMod);
-                cursor.Emit(OpCodes.Mul);
+                cursor.Emit(OpCodes.Ldloc, shouldApplyModVar);
+                cursor.EmitReference(wallJumpSpeedHMultiplier);
+                cursor.EmitDelegate<Func<float, bool, float, float>>((orig, shouldApply, mult) =>
+                {
+                    return shouldApply ? mult * orig : orig;
+                });
             }
 
             if (cursor.TryGotoNext(MoveType.After, instr => instr.MatchLdcR4(initWallJumpSpeedV)))
             {
-                cursor.EmitDelegate<Func<float>>(getVerticalJumpMod);
-                cursor.Emit(OpCodes.Mul);
+                cursor.Emit(OpCodes.Ldloc, shouldApplyModVar);
+                cursor.EmitReference(wallJumpSpeedVMultiplier);
+                cursor.EmitDelegate<Func<float, bool, float, float>>((orig, shouldApply, mult) =>
+                {
+                    return shouldApply ? mult * orig : orig;
+                });
             }
         }
 
-        private static void ModWallbounceJump(ILContext il)
+        private static void ModWallBounce(ILContext il)
         {
             ILCursor cursor = new ILCursor(il);
 
+            VariableDefinition shouldApplyModVar = new VariableDefinition(il.Import(typeof(bool)));
+            il.Body.Variables.Add(shouldApplyModVar);
+
+            cursor.Emit(OpCodes.Ldarg_0);
+            cursor.Emit(OpCodes.Ldarg_0);
+            cursor.Emit(OpCodes.Ldfld, typeof(Player).GetField("onGround", BindingFlags.NonPublic | BindingFlags.Instance));
+            cursor.EmitReference(JumpType.SuperWallJump);
+            cursor.EmitDelegate(ShouldApplyWallJumpBoost);
+            cursor.Emit(OpCodes.Stloc, shouldApplyModVar);
+
             if (cursor.TryGotoNext(MoveType.After, instr => instr.MatchLdcR4(initWallBounceSpeedH)))
             {
-                cursor.EmitDelegate<Func<float>>(getHorizontalWallJumpMod);
-                cursor.Emit(OpCodes.Mul);
+                Logger.Log("HelloCeleste", $"WallBounce V speed changed to: {wallBounceSpeedHMultiplier}");
+
+                cursor.Emit(OpCodes.Ldloc, shouldApplyModVar);
+                cursor.EmitReference(wallBounceSpeedHMultiplier);
+                cursor.EmitDelegate<Func<float, bool, float, float>>((orig, shouldApply, mult) =>
+                {
+                    return shouldApply ? mult * orig : orig;
+                });
             }
 
             if (cursor.TryGotoNext(MoveType.After, instr => instr.MatchLdcR4(initWallBounceSpeedV)))
             {
-                cursor.EmitDelegate<Func<float>>(getVerticalJumpMod);
-                cursor.Emit(OpCodes.Mul);
+                Logger.Log("HelloCeleste", $"WallBounce V speed changed to: {wallBounceSpeedVMultiplier}");
+
+                cursor.Emit(OpCodes.Ldloc, shouldApplyModVar);
+                cursor.EmitReference(wallBounceSpeedVMultiplier);
+                cursor.EmitDelegate<Func<float, bool, float, float>>((orig, shouldApply, mult) =>
+                {
+                    return shouldApply ? mult * orig : orig;
+                });
             }
         }
 
-        private static float getVerticalJumpMod()
+        private static bool ShouldApplyWallJumpBoost(Player self, bool isOnGround, JumpType jumpType)
         {
-            return 0.1f;
+            bool isClimbing = self.StateMachine.State == Player.StClimb;
+
+            if (self == null || isOnGround && !isClimbing)
+            {
+                return false;
+            }
+
+            Solid wall = GetWall(self, isClimbing, jumpType);
+            if (wall != null)
+            {
+                if (wall.GetType() == typeof(BouncyWall))
+                {
+                    return true;
+                }
+            }
+
+            return false;
         }
 
-        private static float getHorizontalJumpMod()
+        private static Solid GetWall(Player self, bool isClimbing, JumpType jumpType)
         {
-            return 2.0f;
-        }
+            float firstCheckDir = -(float)self.Facing;
 
-        private static float getHorizontalWallJumpMod()
-        {
-            // modify wallbounce horizontal speed to the same as walljump horizontal speed
-            float ratio = initWallJumpSpeedH / initWallBounceSpeedH;
-            return ratio * getHorizontalJumpMod();
+            float checkDist = jumpType == JumpType.SuperWallJump ? SuperWallJumpCheckDist : WallJumpCheckDist;
+
+            Solid solid = self.CollideFirst<Solid>(self.Position + firstCheckDir * Vector2.UnitX * checkDist);
+            if (solid == null)
+            {
+                solid = self.CollideFirst<Solid>(self.Position - firstCheckDir * Vector2.UnitX * checkDist);
+            }
+
+            return solid;
         }
     }
 }

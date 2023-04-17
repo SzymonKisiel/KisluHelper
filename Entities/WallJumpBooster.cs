@@ -1,4 +1,5 @@
 ﻿using Celeste.Mod.Entities;
+using Celeste.Mod.KisluHelper.Components;
 using Microsoft.Xna.Framework;
 using Mono.Cecil.Cil;
 using Monocle;
@@ -44,7 +45,7 @@ namespace Celeste.Mod.KisluHelper.Entities
         }
         public override void Render()
         {
-            Draw.Rect(base.X, base.Y, base.Width, base.Height, Color.Red);
+            Draw.Rect(X, Y, Width, Height, Color.Red);
         }
 
         public static void LoadHooks()
@@ -103,20 +104,23 @@ namespace Celeste.Mod.KisluHelper.Entities
             }
         }
 
-        private static float ApplyWallJumpBoost(float origSpeed, Player self, bool isOnGround, JumpType jumpType)
+        private static float ApplyWallJumpBoost(float origSpeed, Player self, bool isOnGround, int jumpTypeVal)
         {
-            bool isClimbing = self.StateMachine.State == Player.StClimb;
+            JumpType jumpType = (JumpType)jumpTypeVal;
+
+            // don't apply boost if it is normal jump instead of climb jump or corner jump
+            bool isClimbing = self.StateMachine.State == Player.StClimb || self.StateMachine.State == Player.StDash;
             if (jumpType == JumpType.ClimbJump && !isClimbing)
             {
                 return origSpeed;
             }
 
-            if (self == null || isOnGround && !isClimbing)
+            if (self == null || isOnGround && (jumpType != JumpType.ClimbJump))
             {
                 return origSpeed;
             }
 
-            Solid wall = GetWall(self, isClimbing, jumpType);
+            Solid wall = GetWall(self, jumpType);
             if (wall != null)
             {
                 if (wall.GetType() == typeof(WallJumpBooster))
@@ -124,14 +128,14 @@ namespace Celeste.Mod.KisluHelper.Entities
                     return origSpeed * wallJumpMultiplier;
                 }
             }
-
             return origSpeed;
         }
 
-        private static Solid GetWall(Player self, bool isClimbing, JumpType jumpType)
+        private static Solid GetWall(Player self, JumpType jumpType)
         {
+            // if player is climb jumping first check the wall they are facing
             float firstCheckDir = (float)self.Facing;
-            if (!isClimbing)
+            if (jumpType != JumpType.ClimbJump)
             {
                 firstCheckDir *= -1;
             }

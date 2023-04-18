@@ -38,12 +38,6 @@ namespace Celeste.Mod.KisluHelper.Entities
             SuperWallJump
         }
 
-        private static FieldInfo stateMachineField;
-
-        private static PropertyInfo stateProperty;
-
-        private static MethodInfo getStateMethod;
-
         public WallJumpBooster(EntityData data, Vector2 offset)
             : base(data.Position + offset, data.Width, data.Height, true)
         {
@@ -55,10 +49,6 @@ namespace Celeste.Mod.KisluHelper.Entities
 
         public static void LoadHooks()
         {
-            stateMachineField = typeof(Player).GetField("StateMachine", BindingFlags.Public | BindingFlags.Instance);
-            stateProperty = typeof(StateMachine).GetProperty("State", BindingFlags.Public | BindingFlags.Instance);
-            getStateMethod = stateProperty.GetGetMethod();
-
             wallJumpHook = new ILHook(typeof(Player).GetMethod("orig_WallJump", BindingFlags.Instance | BindingFlags.NonPublic), ModWallJump);
             IL.Celeste.Player.Jump += ModClimbJump;
             IL.Celeste.Player.SuperWallJump += ModWallBounce;
@@ -79,33 +69,11 @@ namespace Celeste.Mod.KisluHelper.Entities
             ILCursor cursor = new ILCursor(il);
             if (cursor.TryGotoNext(MoveType.After, instr => instr.MatchLdcR4(initWallJumpSpeedV)))
             {
-                // branch over if it's jump instead of climbjump
-                var skipBoostStartInstruction = cursor.Next;
-                
-                cursor.Emit(OpCodes.Br_S, skipBoostStartInstruction);
-
-                var cursor2 = cursor.Clone();
-                cursor.Index--;
-
-                cursor2.Emit(OpCodes.Ldarg_0);
-                cursor2.Emit(OpCodes.Ldarg_0);
-                cursor2.Emit(OpCodes.Ldfld, typeof(Player).GetField("onGround", BindingFlags.NonPublic | BindingFlags.Instance));
-                cursor2.EmitReference(JumpType.ClimbJump);
-                cursor2.EmitDelegate(ApplyWallJumpBoost);
-
-                var applyBoostStartInstruction = cursor.Next.Next;
-
                 cursor.Emit(OpCodes.Ldarg_0);
-                cursor.Emit(OpCodes.Ldfld, stateMachineField);
-                cursor.Emit(OpCodes.Callvirt, getStateMethod);
-                cursor.Emit(OpCodes.Ldc_I4, Player.StClimb);
-                cursor.Emit(OpCodes.Beq_S, applyBoostStartInstruction);
-
                 cursor.Emit(OpCodes.Ldarg_0);
-                cursor.Emit(OpCodes.Ldfld, stateMachineField);
-                cursor.Emit(OpCodes.Callvirt, getStateMethod);
-                cursor.Emit(OpCodes.Ldc_I4, Player.StDash);
-                cursor.Emit(OpCodes.Beq_S, applyBoostStartInstruction);
+                cursor.Emit(OpCodes.Ldfld, typeof(Player).GetField("onGround", BindingFlags.NonPublic | BindingFlags.Instance));
+                cursor.EmitReference(JumpType.ClimbJump);
+                cursor.EmitDelegate(ApplyWallJumpBoost);
             }
         }
 
@@ -137,12 +105,13 @@ namespace Celeste.Mod.KisluHelper.Entities
 
         private static float ApplyWallJumpBoost(float origSpeed, Player self, bool isOnGround, JumpType jumpType)
         {
-            // don't apply boost if it is normal jump instead of climb jump or corner jump
+            // don't apply boost if it is normal jump instead of climb jump or dash-climb jump (corner boost)
             bool isClimbing = self.StateMachine.State == Player.StClimb || self.StateMachine.State == Player.StDash;
             if (jumpType == JumpType.ClimbJump && !isClimbing)
             {
                 return origSpeed;
             }
+
 
             if (self == null || isOnGround && (jumpType != JumpType.ClimbJump))
             {
@@ -164,10 +133,6 @@ namespace Celeste.Mod.KisluHelper.Entities
         {
             // if player is climb jumping first check the wall they are facing
             float firstCheckDir = (float)self.Facing;
-            if (jumpType != JumpType.ClimbJump)
-            {
-                firstCheckDir *= -1;
-            }
 
             float checkDist = jumpType == JumpType.SuperWallJump ? SuperWallJumpCheckDist : WallJumpCheckDist;
 

@@ -1,7 +1,7 @@
 ﻿using Celeste.Mod.Entities;
-using Celeste.Mod.KisluHelper.Components;
 using Celeste.Mod.KisluHelper.Components.Constants;
 using Celeste.Mod.KisluHelper.Components.Enums;
+using Celeste.Mod.KisluHelper.Components.Utils;
 using Microsoft.Xna.Framework;
 using Mono.Cecil.Cil;
 using Monocle;

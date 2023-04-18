@@ -18,6 +18,8 @@ namespace Celeste.Mod.KisluHelper.Components.Constants
 
         public const float WallBounceSpeedV = -160f;
 
+        public const float WallJumpForceMoveTime = 0.16f;
+
         //global::Celeste.Celeste.Freeze(0.1f);
     }
 }

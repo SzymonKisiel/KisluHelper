@@ -1,6 +1,7 @@
 ﻿using Celeste.Mod.Entities;
 using Celeste.Mod.KisluHelper.Components.Constants;
 using Celeste.Mod.KisluHelper.Components.Enums;
+using Celeste.Mod.KisluHelper.Components.Utils;
 using Microsoft.Xna.Framework;
 using Mono.Cecil;
 using Mono.Cecil.Cil;
@@ -17,10 +18,6 @@ namespace Celeste.Mod.KisluHelper.Entities
 
         private static ILHook wallJumpHook;
 
-        private const int WallJumpCheckDist = 3;
-
-        private const int SuperWallJumpCheckDist = 5;
-
         private const float wallJumpSpeedHMultiplier = 2.5f;
 
         private const float wallJumpSpeedVMultiplier = 0.1f;
@@ -29,18 +26,13 @@ namespace Celeste.Mod.KisluHelper.Entities
 
         private const float wallBounceSpeedVMultiplier = wallJumpSpeedVMultiplier * PlayerConstants.WallJumpSpeedV / PlayerConstants.WallBounceSpeedV;
 
+        private const float ForceMoveTime = 0.16f;
+
+        private const float ModifiedForceMoveTime = 0.08f;
+
         public BouncyWall(EntityData data, Vector2 offset)
             : base(data.Position + offset, data.Width, data.Height, true)
         {
-            //collider = this.Collider;
-            //Collider c = new Hitbox(this.Width+3.0f, this.Height, this.Position.X, this.Position.Y);
-            //playerCollider = new PlayerCollider(OnPlayer, c);
-            //Add(playerCollider = new PlayerCollider(OnPlayer));
-        }
-
-        private void OnPlayer(Player player)
-        {
-            Logger.Log("KisluHelper/GoodbyeEntity", "OnPlayer");
         }
 
         public override void Render()
@@ -86,6 +78,7 @@ namespace Celeste.Mod.KisluHelper.Entities
             cursor.Emit(OpCodes.Ldarg_0);
             cursor.Emit(OpCodes.Ldfld, typeof(Player).GetField("onGround", BindingFlags.NonPublic | BindingFlags.Instance));
             cursor.EmitReference(JumpType.WallJump);
+            cursor.Emit(OpCodes.Ldarg_1);
             cursor.EmitDelegate(ShouldApplyWallJumpBoost);
             cursor.Emit(OpCodes.Stloc, shouldApplyModVar);
 
@@ -110,6 +103,16 @@ namespace Celeste.Mod.KisluHelper.Entities
                     // push the ldarg.0 again   
                     cursor.Emit(OpCodes.Ldarg_0);
                 }
+            }
+
+            if (cursor.TryGotoNext(MoveType.After, instr => instr.MatchLdcR4(ForceMoveTime)))
+            {
+                cursor.Emit(OpCodes.Ldloc, shouldApplyModVar);
+                cursor.Emit(OpCodes.Ldc_R4, ModifiedForceMoveTime);
+                cursor.EmitDelegate<Func<float, bool, float, float>>((origVal, shouldApply, modValue) =>
+                {
+                    return shouldApply ? modValue : origVal;
+                });
             }
 
             if (cursor.TryGotoNext(MoveType.After, instr => instr.MatchLdcR4(PlayerConstants.WallJumpSpeedH)))
@@ -144,6 +147,7 @@ namespace Celeste.Mod.KisluHelper.Entities
             cursor.Emit(OpCodes.Ldarg_0);
             cursor.Emit(OpCodes.Ldfld, typeof(Player).GetField("onGround", BindingFlags.NonPublic | BindingFlags.Instance));
             cursor.EmitReference(JumpType.SuperWallJump);
+            cursor.Emit(OpCodes.Ldarg_1);
             cursor.EmitDelegate(ShouldApplyWallJumpBoost);
             cursor.Emit(OpCodes.Stloc, shouldApplyModVar);
 
@@ -157,7 +161,7 @@ namespace Celeste.Mod.KisluHelper.Entities
             cursor.Emit(OpCodes.Ldarg_1);
             cursor.Emit(OpCodes.Stfld, typeof(Player).GetField("forceMoveX", BindingFlags.NonPublic | BindingFlags.Instance));
             cursor.Emit(OpCodes.Ldarg_0);
-            cursor.Emit(OpCodes.Ldc_R4, 0.16f);
+            cursor.Emit(OpCodes.Ldc_R4, ModifiedForceMoveTime);
             cursor.Emit(OpCodes.Stfld, typeof(Player).GetField("forceMoveXTimer", BindingFlags.NonPublic | BindingFlags.Instance));
 
 
@@ -186,7 +190,7 @@ namespace Celeste.Mod.KisluHelper.Entities
             }
         }
 
-        private static bool ShouldApplyWallJumpBoost(Player self, bool isOnGround, JumpType jumpType)
+        private static bool ShouldApplyWallJumpBoost(Player self, bool isOnGround, JumpType jumpType, int jumpDir)
         {
             bool isClimbing = self.StateMachine.State == Player.StClimb;
 
@@ -195,7 +199,7 @@ namespace Celeste.Mod.KisluHelper.Entities
                 return false;
             }
 
-            Solid wall = GetWall(self, jumpType);
+            Solid wall = HookUtils.GetWall(self, jumpType, jumpDir);
             if (wall != null)
             {
                 if (wall.GetType() == typeof(BouncyWall))
@@ -205,21 +209,6 @@ namespace Celeste.Mod.KisluHelper.Entities
             }
 
             return false;
-        }
-
-        private static Solid GetWall(Player self, JumpType jumpType)
-        {
-            float firstCheckDir = (float)self.Facing;
-
-            float checkDist = jumpType == JumpType.SuperWallJump ? SuperWallJumpCheckDist : WallJumpCheckDist;
-
-            Solid solid = self.CollideFirst<Solid>(self.Position + firstCheckDir * Vector2.UnitX * checkDist);
-            if (solid == null)
-            {
-                solid = self.CollideFirst<Solid>(self.Position - firstCheckDir * Vector2.UnitX * checkDist);
-            }
-
-            return solid;
         }
     }
 }

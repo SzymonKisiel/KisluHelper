@@ -73,6 +73,7 @@ namespace Celeste.Mod.KisluHelper.Entities
                 cursor.Emit(OpCodes.Ldarg_0);
                 cursor.Emit(OpCodes.Ldfld, typeof(Player).GetField("onGround", BindingFlags.NonPublic | BindingFlags.Instance));
                 cursor.EmitReference(JumpType.ClimbJump);
+                cursor.Emit(OpCodes.Ldc_I4_0);
                 cursor.EmitDelegate(ApplyWallJumpBoost);
             }
         }
@@ -86,6 +87,7 @@ namespace Celeste.Mod.KisluHelper.Entities
                 cursor.Emit(OpCodes.Ldarg_0);
                 cursor.Emit(OpCodes.Ldfld, typeof(Player).GetField("onGround", BindingFlags.NonPublic | BindingFlags.Instance));
                 cursor.EmitReference(JumpType.WallJump);
+                cursor.Emit(OpCodes.Ldarg_1);
                 cursor.EmitDelegate(ApplyWallJumpBoost);
             }
         }
@@ -99,11 +101,12 @@ namespace Celeste.Mod.KisluHelper.Entities
                 cursor.Emit(OpCodes.Ldarg_0);
                 cursor.Emit(OpCodes.Ldfld, typeof(Player).GetField("onGround", BindingFlags.NonPublic | BindingFlags.Instance));
                 cursor.EmitReference(JumpType.SuperWallJump);
+                cursor.Emit(OpCodes.Ldarg_1);
                 cursor.EmitDelegate(ApplyWallJumpBoost);
             }
         }
 
-        private static float ApplyWallJumpBoost(float origSpeed, Player self, bool isOnGround, JumpType jumpType)
+        private static float ApplyWallJumpBoost(float origSpeed, Player self, bool isOnGround, JumpType jumpType, int dir)
         {
             // don't apply boost if it is normal jump instead of climb jump or dash-climb jump (corner boost)
             bool isClimbing = self.StateMachine.State == Player.StClimb || self.StateMachine.State == Player.StDash;
@@ -118,7 +121,7 @@ namespace Celeste.Mod.KisluHelper.Entities
                 return origSpeed;
             }
 
-            Solid wall = GetWall(self, jumpType);
+            Solid wall = GetWall(self, jumpType, dir);
             if (wall != null)
             {
                 if (wall.GetType() == typeof(WallJumpBooster))
@@ -129,17 +132,30 @@ namespace Celeste.Mod.KisluHelper.Entities
             return origSpeed;
         }
 
-        private static Solid GetWall(Player self, JumpType jumpType)
+        private static Solid GetWall(Player self, JumpType jumpType, int jumpDir)
         {
-            // if player is climb jumping first check the wall they are facing
-            float firstCheckDir = (float)self.Facing;
+            Solid solid = null;
 
-            float checkDist = jumpType == JumpType.SuperWallJump ? SuperWallJumpCheckDist : WallJumpCheckDist;
+            float checkDist = WallJumpCheckDist;
+            float checkDir;
 
-            Solid solid = self.CollideFirst<Solid>(self.Position + firstCheckDir * Vector2.UnitX * checkDist);
-            if (solid == null)
+            switch (jumpType)
             {
-                solid = self.CollideFirst<Solid>(self.Position - firstCheckDir * Vector2.UnitX * checkDist);
+                case JumpType.ClimbJump:
+                    checkDir = (float)self.Facing;
+                    solid = self.CollideFirst<Solid>(self.Position + checkDir * Vector2.UnitX * checkDist);
+                    if (solid == null)
+                    {
+                        solid = self.CollideFirst<Solid>(self.Position - checkDir * Vector2.UnitX * checkDist);
+                    }
+                    break;
+                case JumpType.WallJump:
+                    checkDir = -jumpDir;
+                    solid = self.CollideFirst<Solid>(self.Position + checkDir * Vector2.UnitX * checkDist);
+                    break;
+                case JumpType.SuperWallJump:
+                    checkDist = SuperWallJumpCheckDist;
+                    goto case JumpType.WallJump;
             }
 
             return solid;

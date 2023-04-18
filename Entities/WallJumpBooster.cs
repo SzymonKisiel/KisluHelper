@@ -1,5 +1,7 @@
 ﻿using Celeste.Mod.Entities;
 using Celeste.Mod.KisluHelper.Components;
+using Celeste.Mod.KisluHelper.Components.Constants;
+using Celeste.Mod.KisluHelper.Components.Enums;
 using Microsoft.Xna.Framework;
 using Mono.Cecil.Cil;
 using Monocle;
@@ -16,27 +18,14 @@ namespace Celeste.Mod.KisluHelper.Entities
     public class WallJumpBooster : Solid
     {
         private static ILHook wallJumpHook;
-        
+
         private const int WallJumpCheckDist = 3;
 
         private const int SuperWallJumpCheckDist = 5;
 
-        private const float initWallJumpSpeedH = 130f;
-
-        private const float initWallJumpSpeedV = -105f;
-
-        private const float initWallBounceSpeedH = 170f;
-
         private const float initWallBounceSpeedV = -160f;
 
         private const float wallJumpMultiplier = 2.0f;
-
-        private enum JumpType
-        {
-            ClimbJump,
-            WallJump,
-            SuperWallJump
-        }
 
         public WallJumpBooster(EntityData data, Vector2 offset)
             : base(data.Position + offset, data.Width, data.Height, true)
@@ -67,7 +56,7 @@ namespace Celeste.Mod.KisluHelper.Entities
         private static void ModClimbJump(ILContext il)
         {
             ILCursor cursor = new ILCursor(il);
-            if (cursor.TryGotoNext(MoveType.After, instr => instr.MatchLdcR4(initWallJumpSpeedV)))
+            if (cursor.TryGotoNext(MoveType.After, instr => instr.MatchLdcR4(PlayerConstants.WallJumpSpeedV)))
             {
                 cursor.Emit(OpCodes.Ldarg_0);
                 cursor.Emit(OpCodes.Ldarg_0);
@@ -81,7 +70,7 @@ namespace Celeste.Mod.KisluHelper.Entities
         private static void ModWallJump(ILContext il)
         {
             ILCursor cursor = new ILCursor(il);
-            if (cursor.TryGotoNext(MoveType.After, instr => instr.MatchLdcR4(initWallJumpSpeedV)))
+            if (cursor.TryGotoNext(MoveType.After, instr => instr.MatchLdcR4(PlayerConstants.WallJumpSpeedV)))
             {
                 cursor.Emit(OpCodes.Ldarg_0);
                 cursor.Emit(OpCodes.Ldarg_0);
@@ -95,7 +84,7 @@ namespace Celeste.Mod.KisluHelper.Entities
         private static void ModWallBounce(ILContext il)
         {
             ILCursor cursor = new ILCursor(il);
-            if (cursor.TryGotoNext(MoveType.After, instr => instr.MatchLdcR4(initWallBounceSpeedV)))
+            if (cursor.TryGotoNext(MoveType.After, instr => instr.MatchLdcR4(PlayerConstants.WallBounceSpeedV)))
             {
                 cursor.Emit(OpCodes.Ldarg_0);
                 cursor.Emit(OpCodes.Ldarg_0);
@@ -121,7 +110,7 @@ namespace Celeste.Mod.KisluHelper.Entities
                 return origSpeed;
             }
 
-            Solid wall = GetWall(self, jumpType, dir);
+            Solid wall = HookUtils.GetWall(self, jumpType, dir);
             if (wall != null)
             {
                 if (wall.GetType() == typeof(WallJumpBooster))
@@ -130,35 +119,6 @@ namespace Celeste.Mod.KisluHelper.Entities
                 }
             }
             return origSpeed;
-        }
-
-        private static Solid GetWall(Player self, JumpType jumpType, int jumpDir)
-        {
-            Solid solid = null;
-
-            float checkDist = WallJumpCheckDist;
-            float checkDir;
-
-            switch (jumpType)
-            {
-                case JumpType.ClimbJump:
-                    checkDir = (float)self.Facing;
-                    solid = self.CollideFirst<Solid>(self.Position + checkDir * Vector2.UnitX * checkDist);
-                    if (solid == null)
-                    {
-                        solid = self.CollideFirst<Solid>(self.Position - checkDir * Vector2.UnitX * checkDist);
-                    }
-                    break;
-                case JumpType.WallJump:
-                    checkDir = -jumpDir;
-                    solid = self.CollideFirst<Solid>(self.Position + checkDir * Vector2.UnitX * checkDist);
-                    break;
-                case JumpType.SuperWallJump:
-                    checkDist = SuperWallJumpCheckDist;
-                    goto case JumpType.WallJump;
-            }
-
-            return solid;
         }
     }
 }

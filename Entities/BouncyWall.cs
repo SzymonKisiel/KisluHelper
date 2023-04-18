@@ -1,5 +1,8 @@
 ﻿using Celeste.Mod.Entities;
+using Celeste.Mod.KisluHelper.Components.Constants;
+using Celeste.Mod.KisluHelper.Components.Enums;
 using Microsoft.Xna.Framework;
+using Mono.Cecil;
 using Mono.Cecil.Cil;
 using Monocle;
 using MonoMod.Cil;
@@ -18,27 +21,13 @@ namespace Celeste.Mod.KisluHelper.Entities
 
         private const int SuperWallJumpCheckDist = 5;
 
-        private const float initWallJumpSpeedH = 130f;
-
-        private const float initWallJumpSpeedV = -105f;
-
-        private const float initWallBounceSpeedH = 170f;
-
-        private const float initWallBounceSpeedV = -160f;
-
         private const float wallJumpSpeedHMultiplier = 2.5f;
 
         private const float wallJumpSpeedVMultiplier = 0.1f;
 
-        private const float wallBounceSpeedHMultiplier = wallJumpSpeedHMultiplier * initWallJumpSpeedH / initWallBounceSpeedH;
+        private const float wallBounceSpeedHMultiplier = wallJumpSpeedHMultiplier * PlayerConstants.WallJumpSpeedH / PlayerConstants.WallBounceSpeedH;
 
-        private const float wallBounceSpeedVMultiplier = wallJumpSpeedVMultiplier * initWallJumpSpeedV / initWallBounceSpeedV;
-
-        private enum JumpType
-        {
-            WallJump,
-            SuperWallJump
-        }
+        private const float wallBounceSpeedVMultiplier = wallJumpSpeedVMultiplier * PlayerConstants.WallJumpSpeedV / PlayerConstants.WallBounceSpeedV;
 
         public BouncyWall(EntityData data, Vector2 offset)
             : base(data.Position + offset, data.Width, data.Height, true)
@@ -123,7 +112,7 @@ namespace Celeste.Mod.KisluHelper.Entities
                 }
             }
 
-            if (cursor.TryGotoNext(MoveType.After, instr => instr.MatchLdcR4(initWallJumpSpeedH)))
+            if (cursor.TryGotoNext(MoveType.After, instr => instr.MatchLdcR4(PlayerConstants.WallJumpSpeedH)))
             {
                 cursor.Emit(OpCodes.Ldloc, shouldApplyModVar);
                 cursor.EmitReference(wallJumpSpeedHMultiplier);
@@ -133,7 +122,7 @@ namespace Celeste.Mod.KisluHelper.Entities
                 });
             }
 
-            if (cursor.TryGotoNext(MoveType.After, instr => instr.MatchLdcR4(initWallJumpSpeedV)))
+            if (cursor.TryGotoNext(MoveType.After, instr => instr.MatchLdcR4(PlayerConstants.WallJumpSpeedV)))
             {
                 cursor.Emit(OpCodes.Ldloc, shouldApplyModVar);
                 cursor.EmitReference(wallJumpSpeedVMultiplier);
@@ -149,7 +138,7 @@ namespace Celeste.Mod.KisluHelper.Entities
             ILCursor cursor = new ILCursor(il);
 
             VariableDefinition shouldApplyModVar = new VariableDefinition(il.Import(typeof(bool)));
-            il.Body.Variables.Add(shouldApplyModVar);
+            il.Body.Variables.Add(shouldApplyModVar); 
 
             cursor.Emit(OpCodes.Ldarg_0);
             cursor.Emit(OpCodes.Ldarg_0);
@@ -172,7 +161,7 @@ namespace Celeste.Mod.KisluHelper.Entities
             cursor.Emit(OpCodes.Stfld, typeof(Player).GetField("forceMoveXTimer", BindingFlags.NonPublic | BindingFlags.Instance));
 
 
-            if (cursor.TryGotoNext(MoveType.After, instr => instr.MatchLdcR4(initWallBounceSpeedH)))
+            if (cursor.TryGotoNext(MoveType.After, instr => instr.MatchLdcR4(PlayerConstants.WallBounceSpeedH)))
             {
                 Logger.Log("HelloCeleste", $"WallBounce V speed changed to: {wallBounceSpeedHMultiplier}");
 
@@ -184,7 +173,7 @@ namespace Celeste.Mod.KisluHelper.Entities
                 });
             }
 
-            if (cursor.TryGotoNext(MoveType.After, instr => instr.MatchLdcR4(initWallBounceSpeedV)))
+            if (cursor.TryGotoNext(MoveType.After, instr => instr.MatchLdcR4(PlayerConstants.WallBounceSpeedV)))
             {
                 Logger.Log("HelloCeleste", $"WallBounce V speed changed to: {wallBounceSpeedVMultiplier}");
 
@@ -206,7 +195,7 @@ namespace Celeste.Mod.KisluHelper.Entities
                 return false;
             }
 
-            Solid wall = GetWall(self, isClimbing, jumpType);
+            Solid wall = GetWall(self, jumpType);
             if (wall != null)
             {
                 if (wall.GetType() == typeof(BouncyWall))
@@ -218,9 +207,9 @@ namespace Celeste.Mod.KisluHelper.Entities
             return false;
         }
 
-        private static Solid GetWall(Player self, bool isClimbing, JumpType jumpType)
+        private static Solid GetWall(Player self, JumpType jumpType)
         {
-            float firstCheckDir = -(float)self.Facing;
+            float firstCheckDir = (float)self.Facing;
 
             float checkDist = jumpType == JumpType.SuperWallJump ? SuperWallJumpCheckDist : WallJumpCheckDist;
 

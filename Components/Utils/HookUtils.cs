@@ -1,13 +1,18 @@
 ﻿using Celeste.Mod.KisluHelper.Components.Enums;
 using Microsoft.Xna.Framework;
 
-namespace Celeste.Mod.KisluHelper.Components
+namespace Celeste.Mod.KisluHelper.Components.Utils
 {
     public static class HookUtils
     {
         private const int WallJumpCheckDist = 3;
 
         private const int SuperWallJumpCheckDist = 5;
+
+        public static void DebugPrint<T>(string prefix, T output)
+        {
+            Logger.Log("KisluHelper/Utils", $"{prefix}: {output}");
+        }
 
         public static Solid GetWall(Player self, JumpType jumpType, int jumpDir)
         {

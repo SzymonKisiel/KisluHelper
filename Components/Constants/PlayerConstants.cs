@@ -8,6 +8,8 @@ namespace Celeste.Mod.KisluHelper.Components.Constants
 {
     public static class PlayerConstants
     {
+        public const float JumpSpeedV = -105f;
+
         public const float WallJumpSpeedH = 130f;
 
         public const float WallJumpSpeedV = -105f;
@@ -15,5 +17,7 @@ namespace Celeste.Mod.KisluHelper.Components.Constants
         public const float WallBounceSpeedH = 170f;
 
         public const float WallBounceSpeedV = -160f;
+
+        //global::Celeste.Celeste.Freeze(0.1f);
     }
 }

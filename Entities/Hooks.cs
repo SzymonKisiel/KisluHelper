@@ -19,12 +19,14 @@ namespace Celeste.Mod.KisluHelper
     {
         internal static void Load()
         {
+            JumpBooster.LoadHooks();
             WallJumpBooster.LoadHooks();
             BouncyWall.LoadHooks();
         }
 
         internal static void Unload()
         {
+            JumpBooster.UnloadHooks();
             WallJumpBooster.UnloadHooks();
             BouncyWall.UnloadHooks();
         }

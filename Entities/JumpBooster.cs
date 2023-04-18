@@ -1,4 +1,6 @@
 ﻿using Celeste.Mod.Entities;
+using Celeste.Mod.KisluHelper.Components.Constants;
+using Celeste.Mod.KisluHelper.Components.Utils;
 using Microsoft.Xna.Framework;
 using Mono.Cecil.Cil;
 using Monocle;
@@ -11,65 +13,26 @@ namespace Celeste.Mod.KisluHelper.Entities
     [CustomEntity("KisluHelper/JumpBooster")]
     public class JumpBooster : Solid
     {
-        private bool isColliding = false;
+        private const float JumpBoostMult = 2.0f;
 
         public JumpBooster(EntityData data, Vector2 offset)
             : base(data.Position + offset, data.Width, data.Height, true)
         {
         }
 
-        private void OnCollide(Player player)
-        {
-            Logger.Log("KisluHelper/HelloEntity", "Collided");
-            //player.Speed.X *= 1.1f;
-        }
-
         public override void Render()
         {
-            Draw.Rect(base.X, base.Y, base.Width, base.Height, Color.Yellow);
+            Draw.Rect(X, Y, Width, Height, Color.Yellow);
         }
 
-        public override void Update()
+        public static void LoadHooks()
         {
-            base.Update();
-            Player player = CollideFirst<Player>(Position - Vector2.UnitY);
-            if (player != null && !isColliding)
-            {
-                isColliding = true;
-                LoadHooks();
-
-                //this.OnCollide(player);
-                //global::Celeste.Celeste.Freeze(0.1f);
-                //player.Bounce(Position.Y - Vector2.UnitY.Y);
-                //player.MoveTowardsX(player.X - 1, 10.0f);
-                //player.Jump();
-                //player.HiccupJump();
-                //player.Speed.Y += -200f;
-                //player.Jump();
-                //player.StateMachine.State = 0;
-                //player.Speed.Y = -250f;
-                //player.StartJumpGraceTime();
-            }
-            else if (player == null && isColliding)
-            {
-                if (isColliding)
-                {
-                    UnloadHooks();
-                }
-                isColliding = false;
-            }
-        }
-
-        private void LoadHooks()
-        {
-            Logger.Log("KisluHelper/HelloEntity", "Entered HelloEntity");
             IL.Celeste.Player.Jump += ModJump;
             IL.Celeste.Player.SuperJump += ModJump;
         }
 
-        private void UnloadHooks()
+        public static void UnloadHooks()
         {
-            Logger.Log("KisluHelper/HelloEntity", "Left HelloEntity");
             IL.Celeste.Player.Jump -= ModJump;
             IL.Celeste.Player.SuperJump -= ModJump;
         }
@@ -77,16 +40,25 @@ namespace Celeste.Mod.KisluHelper.Entities
         private static void ModJump(ILContext il)
         {
             ILCursor cursor = new ILCursor(il);
-            if (cursor.TryGotoNext(MoveType.After, instr => instr.MatchLdcR4(-105f)))
+            if (cursor.TryGotoNext(MoveType.After, instr => instr.MatchLdcR4(PlayerConstants.JumpSpeedV)))
             {
-                cursor.EmitDelegate<Func<float>>(getJumpMod);
-                cursor.Emit(OpCodes.Mul);
+                cursor.Emit(OpCodes.Ldarg_0);
+                cursor.EmitDelegate(ApplyJumpBoost);
             }
         }
 
-        private static float getJumpMod()
+        private static float ApplyJumpBoost(float orig, Player self)
         {
-            return 2.0f;
+            var ground = HookUtils.GetGround(self);
+            if (ground != null)
+            {
+                if (ground.GetType() == typeof(JumpBooster))
+                {
+                    return orig * JumpBoostMult;
+                }
+            }
+
+            return orig;
         }
     }
 }

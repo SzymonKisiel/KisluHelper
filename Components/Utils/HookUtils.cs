@@ -42,5 +42,10 @@ namespace Celeste.Mod.KisluHelper.Components.Utils
 
             return solid;
         }
+
+        public static Solid GetGround(Player self)
+        {
+            return self.CollideFirst<Solid>(self.Position + Vector2.UnitY);
+        }
     }
 }
